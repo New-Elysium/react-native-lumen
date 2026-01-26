@@ -84,3 +84,8 @@ android/generated
 
 # React Native Nitro Modules
 nitrogen/
+
+
+# Example app
+example/node_modules
+example/.expo

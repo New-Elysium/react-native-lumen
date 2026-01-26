@@ -1,20 +1,36 @@
-import { Text, View, StyleSheet } from 'react-native';
-import { multiply } from 'react-native-lumen';
-
-const result = multiply(3, 7);
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { TourProvider, WigglySpringConfig } from 'react-native-lumen';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { Home } from './Home';
+import { tourSteps } from './data/tourSteps';
 
 export default function App() {
+  // Extract keys for order
+  const stepsOrder = Object.values(tourSteps)
+    .sort((a, b) => a.order - b.order)
+    .map((step) => step.key);
+
   return (
-    <View style={styles.container}>
-      <Text>Result: {result}</Text>
-    </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <SafeAreaView style={{ flex: 1 }}>
+          <TourProvider
+            stepsOrder={stepsOrder}
+            backdropOpacity={0.6}
+            config={{
+              // preventInteraction: true,
+              springConfig: WigglySpringConfig,
+              labels: {
+                next: 'Go Next',
+                finish: 'Complete!',
+                skip: 'Skip Tour',
+              },
+            }}
+          >
+            <Home />
+          </TourProvider>
+        </SafeAreaView>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
