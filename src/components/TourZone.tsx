@@ -175,7 +175,7 @@ export const TourZone: React.FC<TourZoneProps> = ({
           targetRadius.value = withSpring(borderRadius, springConfig);
         }
       }
-    } catch (e) {
+    } catch {
       // Silently ignore measurement errors on UI thread
     }
   }, isActive);
@@ -353,7 +353,6 @@ export const TourZone: React.FC<TourZoneProps> = ({
     order,
     shape,
     borderRadius,
-    registerStep,
     registerStep,
     unregisterStep,
     clickable,

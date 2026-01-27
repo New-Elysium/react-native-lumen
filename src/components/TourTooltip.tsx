@@ -139,13 +139,7 @@ export const TourTooltip = memo(() => {
           styles.container,
           tooltipStyle,
           // Reset styles for custom render so the user has full control
-          {
-            backgroundColor: 'transparent',
-            shadowOpacity: 0,
-            elevation: 0,
-            padding: 0,
-            borderRadius: 0,
-          },
+          styles.resetStyle,
         ]}
         onLayout={handleTooltipLayout}
       >
@@ -179,7 +173,7 @@ export const TourTooltip = memo(() => {
             <Text style={styles.skipText}>{labelSkip}</Text>
           </TouchableOpacity>
         )}
-        {isLast && <View style={{ width: 10 }} />}
+        {isLast && <View style={styles.spacer} />}
 
         <TouchableOpacity onPress={next} style={styles.buttonPrimary}>
           <Text style={styles.primaryButtonText}>{labelNext}</Text>
@@ -248,5 +242,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  resetStyle: {
+    backgroundColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+    padding: 0,
+    borderRadius: 0,
+  },
+  spacer: {
+    width: 10,
   },
 });

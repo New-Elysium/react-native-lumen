@@ -2,7 +2,6 @@ import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { TourZone, useTour } from 'react-native-lumen';
 import { User, BarChart2, Plus, Info, Users, Tag } from 'lucide-react-native';
 import { tourSteps } from './data/tourSteps';
-import { useEffect } from 'react';
 import Animated from 'react-native-reanimated';
 
 const Card = ({
@@ -22,10 +21,6 @@ const Card = ({
 
 export const Home = () => {
   const { start, scrollViewRef } = useTour();
-
-  useEffect(() => {
-    start(tourSteps.welcome.key);
-  }, []);
 
   return (
     <Animated.ScrollView
@@ -50,7 +45,7 @@ export const Home = () => {
           stepKey={tourSteps.profile.key}
           description={tourSteps.profile.description}
           borderRadius={16}
-          style={{ flex: 1 }}
+          style={styles.container}
         >
           <Card title="Profile" icon={User} color="#FF6B6B" />
         </TourZone>
@@ -59,7 +54,7 @@ export const Home = () => {
           stepKey={tourSteps.stats.key}
           description={tourSteps.stats.description}
           borderRadius={16}
-          style={{ flex: 1 }}
+          style={styles.container}
         >
           <Card title="Stats" icon={BarChart2} color="#4ECDC4" />
         </TourZone>
@@ -138,7 +133,7 @@ export const Home = () => {
           description={tourSteps.wallet.description}
           order={tourSteps.wallet.order}
           borderRadius={16}
-          style={{ flex: 1 }}
+          style={styles.container}
         >
           <Card title="Wallet" icon={User} color="#6b95ff" />
         </TourZone>
@@ -148,7 +143,7 @@ export const Home = () => {
           description={tourSteps.products.description}
           order={tourSteps.products.order}
           borderRadius={16}
-          style={{ flex: 1 }}
+          style={styles.container}
         >
           <Card title="Products" icon={BarChart2} color="#c24ecd" />
         </TourZone>
@@ -174,7 +169,6 @@ export const Home = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
   scrollContent: {
     padding: 20,

@@ -333,7 +333,7 @@ export const TourProvider: React.FC<TourProviderProps> = ({
       opacity,
       steps,
       config,
-      // containerRef is stable
+      containerRef,
       scrollViewRef,
       setScrollViewRef,
     ]

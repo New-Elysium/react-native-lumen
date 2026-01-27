@@ -3,6 +3,7 @@ import { TourProvider, WigglySpringConfig } from 'react-native-lumen';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Home } from './Home';
 import { tourSteps } from './data/tourSteps';
+import { StyleSheet } from 'react-native';
 
 export default function App() {
   // Extract keys for order
@@ -11,9 +12,9 @@ export default function App() {
     .map((step) => step.key);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider>
-        <SafeAreaView style={{ flex: 1 }}>
+        <SafeAreaView style={styles.container}>
           <TourProvider
             stepsOrder={stepsOrder}
             backdropOpacity={0.6}
@@ -34,3 +35,9 @@ export default function App() {
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});
