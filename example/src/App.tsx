@@ -3,6 +3,7 @@ import {
   TourProvider,
   WigglySpringConfig,
   type SpotlightStyle,
+  type TourPersistenceConfig,
 } from 'react-native-lumen';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Home } from './Home';
@@ -18,6 +19,15 @@ const globalSpotlightStyle: SpotlightStyle = {
   glowColor: '#007AFF',
   glowOpacity: 0.4,
   glowRadius: 8,
+};
+
+// Persistence configuration - auto-detects MMKV v4 or AsyncStorage
+const persistenceConfig: TourPersistenceConfig = {
+  enabled: true,
+  tourId: 'lumen-example-tour-v1',
+  autoResume: true, // Resume from saved step when start() is called
+  clearOnComplete: true, // Clear progress when tour finishes
+  // maxAge: 7 * 24 * 60 * 60 * 1000, // Optional: expire after 7 days
 };
 
 export default function App() {
@@ -43,6 +53,8 @@ export default function App() {
               },
               // Global spotlight style - can be overridden per-step
               spotlightStyle: globalSpotlightStyle,
+              // Persistence - saves progress to storage (MMKV or AsyncStorage)
+              persistence: persistenceConfig,
             }}
           >
             <Home />

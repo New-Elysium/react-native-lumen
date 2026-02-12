@@ -7,6 +7,13 @@ export { TourTooltip } from './components/TourTooltip';
 export * from './constants/defaults';
 export * from './constants/animations';
 
+// Storage utilities for advanced use cases
+export {
+  detectStorage,
+  clearStorageCache,
+  type StorageType,
+} from './utils/storage';
+
 // Re-export specific types for convenience
 export type {
   SpotlightStyle,
@@ -16,4 +23,6 @@ export type {
   TourConfig,
   TourLabels,
   TooltipStyles,
+  TourPersistenceConfig,
+  StorageAdapter,
 } from './types';

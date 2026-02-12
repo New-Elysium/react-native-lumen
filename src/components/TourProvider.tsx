@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useMemo,
   useRef,
+  useEffect,
   type ComponentType,
 } from 'react';
 import {
@@ -20,6 +21,7 @@ import type {
   TourConfig,
   InternalTourContextType,
   SpotlightStyle,
+  StorageAdapter,
 } from '../types';
 import { TourContext } from '../context/TourContext';
 import { TourOverlay } from './TourOverlay';
@@ -30,6 +32,12 @@ import {
   DEFAULT_SPOTLIGHT_STYLE,
   resolveSpotlightStyle,
 } from '../constants/defaults';
+import {
+  detectStorage,
+  saveTourProgress,
+  loadTourProgress,
+  clearTourProgress,
+} from '../utils/storage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -132,10 +140,56 @@ export const TourProvider: React.FC<TourProviderProps> = ({
 }) => {
   const [steps, setSteps] = useState<Record<string, TourStep>>({});
   const [currentStep, setCurrentStep] = useState<string | null>(null);
+  const [hasSavedProgress, setHasSavedProgress] = useState(false);
 
   // ref to access latest measurements without causing re-renders
   const measurements = useRef<Record<string, MeasureResult>>({});
   const containerRef = useAnimatedRef<any>();
+
+  // ─── Persistence Setup ─────────────────────────────────────────────────────
+  const persistenceConfig = config?.persistence;
+  const isPersistenceEnabled = persistenceConfig?.enabled ?? false;
+  const tourId = persistenceConfig?.tourId ?? 'default';
+  const autoResume = persistenceConfig?.autoResume ?? true;
+  const clearOnComplete = persistenceConfig?.clearOnComplete ?? true;
+  const maxAge = persistenceConfig?.maxAge;
+
+  // Get storage adapter (custom or auto-detected)
+  const storageAdapter = useMemo<StorageAdapter | null>(() => {
+    if (!isPersistenceEnabled) return null;
+    if (persistenceConfig?.storage) return persistenceConfig.storage;
+    const detected = detectStorage();
+    return detected.adapter;
+  }, [isPersistenceEnabled, persistenceConfig?.storage]);
+
+  // Check for saved progress on mount
+  useEffect(() => {
+    if (!isPersistenceEnabled || !storageAdapter) {
+      setHasSavedProgress(false);
+      return;
+    }
+
+    const checkSavedProgress = async () => {
+      try {
+        const savedProgress = await loadTourProgress(storageAdapter, tourId);
+        if (savedProgress) {
+          // Check if progress is expired
+          if (maxAge && Date.now() - savedProgress.timestamp > maxAge) {
+            await clearTourProgress(storageAdapter, tourId);
+            setHasSavedProgress(false);
+          } else {
+            setHasSavedProgress(true);
+          }
+        } else {
+          setHasSavedProgress(false);
+        }
+      } catch {
+        setHasSavedProgress(false);
+      }
+    };
+
+    checkSavedProgress();
+  }, [isPersistenceEnabled, storageAdapter, tourId, maxAge]);
 
   // --- Shared Values for Animations (Zero Bridge Crossing) ---
   // Initialize off-screen or 0
@@ -346,10 +400,54 @@ export const TourProvider: React.FC<TourProviderProps> = ({
     return stepKeys;
   }, [initialStepsOrder, steps]);
 
+  // Save progress when step changes
+  useEffect(() => {
+    if (!isPersistenceEnabled || !storageAdapter || !currentStep) return;
+
+    const ordered = getOrderedSteps();
+    const stepIndex = ordered.indexOf(currentStep);
+
+    if (stepIndex >= 0) {
+      saveTourProgress(storageAdapter, tourId, currentStep, stepIndex).catch(
+        () => {
+          // Silently ignore save errors
+        }
+      );
+    }
+  }, [
+    currentStep,
+    isPersistenceEnabled,
+    storageAdapter,
+    tourId,
+    getOrderedSteps,
+  ]);
+
   const start = useCallback(
-    (stepKey?: string) => {
+    async (stepKey?: string) => {
       const ordered = getOrderedSteps();
-      const firstStep = stepKey || ordered[0];
+
+      let targetStep = stepKey;
+
+      // If no specific step and autoResume is enabled, try to restore from storage
+      if (!targetStep && isPersistenceEnabled && storageAdapter && autoResume) {
+        try {
+          const savedProgress = await loadTourProgress(storageAdapter, tourId);
+          if (savedProgress) {
+            // Check if progress is expired
+            if (maxAge && Date.now() - savedProgress.timestamp > maxAge) {
+              await clearTourProgress(storageAdapter, tourId);
+              setHasSavedProgress(false);
+            } else if (ordered.includes(savedProgress.currentStepKey)) {
+              // Verify the saved step still exists
+              targetStep = savedProgress.currentStepKey;
+            }
+          }
+        } catch {
+          // Ignore load errors, start from beginning
+        }
+      }
+
+      const firstStep = targetStep || ordered[0];
       if (firstStep) {
         setCurrentStep(firstStep);
         // We need to wait for layout if it's not ready?
@@ -361,13 +459,33 @@ export const TourProvider: React.FC<TourProviderProps> = ({
         setTimeout(() => animateToStep(firstStep), 0);
       }
     },
-    [getOrderedSteps, animateToStep]
+    [
+      getOrderedSteps,
+      animateToStep,
+      isPersistenceEnabled,
+      storageAdapter,
+      autoResume,
+      tourId,
+      maxAge,
+    ]
   );
 
   const stop = useCallback(() => {
     setCurrentStep(null);
     opacity.value = withTiming(0, { duration: 300 });
+    // Note: We do NOT clear progress on stop - only on complete or explicit clearProgress
   }, [opacity]);
+
+  // Clear progress helper
+  const clearProgress = useCallback(async () => {
+    if (!isPersistenceEnabled || !storageAdapter) return;
+    try {
+      await clearTourProgress(storageAdapter, tourId);
+      setHasSavedProgress(false);
+    } catch {
+      // Silently ignore clear errors
+    }
+  }, [isPersistenceEnabled, storageAdapter, tourId]);
 
   const next = useCallback(() => {
     if (!currentStep) return;
@@ -386,9 +504,25 @@ export const TourProvider: React.FC<TourProviderProps> = ({
         stop();
       }
     } else {
-      stop(); // End of tour
+      // End of tour - clear progress if configured
+      if (isPersistenceEnabled && clearOnComplete && storageAdapter) {
+        clearTourProgress(storageAdapter, tourId)
+          .then(() => setHasSavedProgress(false))
+          .catch(() => {});
+      }
+      stop();
     }
-  }, [currentStep, getOrderedSteps, stop, opacity, backdropOpacity]);
+  }, [
+    currentStep,
+    getOrderedSteps,
+    stop,
+    opacity,
+    backdropOpacity,
+    isPersistenceEnabled,
+    clearOnComplete,
+    storageAdapter,
+    tourId,
+  ]);
 
   const prev = useCallback(() => {
     if (!currentStep) return;
@@ -449,6 +583,8 @@ export const TourProvider: React.FC<TourProviderProps> = ({
       scrollViewRef,
       setScrollViewRef,
       currentSpotlightStyle,
+      clearProgress,
+      hasSavedProgress,
     }),
     [
       start,
@@ -472,6 +608,8 @@ export const TourProvider: React.FC<TourProviderProps> = ({
       scrollViewRef,
       setScrollViewRef,
       currentSpotlightStyle,
+      clearProgress,
+      hasSavedProgress,
     ]
   );
 

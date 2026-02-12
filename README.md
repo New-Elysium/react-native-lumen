@@ -288,6 +288,83 @@ Available presets:
 - `SnappySpringConfig` (Fast & Responsive)
 - `and more!`
 
+### Persistence (Resume Tours)
+
+React Native Lumen supports saving tour progress so users can resume where they left off. The library auto-detects available storage (MMKV v4 or AsyncStorage).
+
+```tsx
+import { TourProvider } from 'react-native-lumen';
+
+export default function App() {
+  return (
+    <TourProvider
+      config={{
+        persistence: {
+          enabled: true,
+          tourId: 'onboarding-v1', // Unique ID for this tour
+          autoResume: true,        // Auto-resume from saved step (default: true)
+          clearOnComplete: true,   // Clear progress when tour finishes (default: true)
+          maxAge: 7 * 24 * 60 * 60 * 1000, // Optional: expire after 7 days
+        },
+      }}
+    >
+      <AppContent />
+    </TourProvider>
+  );
+}
+```
+
+#### Storage Support
+
+The library automatically detects and uses:
+- **MMKV v4** (`react-native-mmkv`) - Fastest, recommended
+- **AsyncStorage** (`@react-native-async-storage/async-storage`) - Fallback
+
+No additional setup required if either package is installed.
+
+#### Custom Storage
+
+You can provide a custom storage adapter:
+
+```tsx
+import { TourProvider, type StorageAdapter } from 'react-native-lumen';
+
+const customStorage: StorageAdapter = {
+  getItem: (key) => myStorage.get(key),
+  setItem: (key, value) => myStorage.set(key, value),
+  removeItem: (key) => myStorage.remove(key),
+};
+
+<TourProvider
+  config={{
+    persistence: {
+      enabled: true,
+      tourId: 'my-tour',
+      storage: customStorage,
+    },
+  }}
+>
+  ...
+</TourProvider>
+```
+
+#### Persistence API
+
+```tsx
+const { start, clearProgress, hasSavedProgress } = useTour();
+
+// Check if there's saved progress
+if (hasSavedProgress) {
+  // Show "Resume Tour" button
+}
+
+// Start tour (auto-resumes if enabled)
+start();
+
+// Clear saved progress manually
+await clearProgress();
+```
+
 ### Custom Tooltip Card
 
 You can fully replace the default tooltip with your own beautiful UI using the `renderCard` prop in `config`.

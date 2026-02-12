@@ -213,6 +213,59 @@ export interface CardProps {
   labels?: TourLabels;
 }
 
+// ─── Persistence Types ───────────────────────────────────────────────────────
+
+/**
+ * Storage adapter interface for tour persistence.
+ * Compatible with MMKV v4 and AsyncStorage APIs.
+ */
+export interface StorageAdapter {
+  getItem: (key: string) => Promise<string | null> | string | null;
+  setItem: (key: string, value: string) => Promise<void> | void;
+  removeItem: (key: string) => Promise<void> | void;
+}
+
+/**
+ * Configuration for tour progress persistence.
+ */
+export interface TourPersistenceConfig {
+  /**
+   * Enable persistence. When true, the library will auto-detect available storage
+   * (MMKV v4 or AsyncStorage) and save/restore tour progress.
+   * @default false
+   */
+  enabled: boolean;
+  /**
+   * Unique identifier for this tour. Used as the storage key.
+   * Required when persistence is enabled.
+   * @example 'onboarding-tour' or 'feature-tour-v2'
+   */
+  tourId: string;
+  /**
+   * Custom storage adapter. If not provided, the library will auto-detect
+   * MMKV v4 or AsyncStorage.
+   */
+  storage?: StorageAdapter;
+  /**
+   * If true, automatically resume the tour from the saved step when start() is called
+   * without a specific step key.
+   * @default true
+   */
+  autoResume?: boolean;
+  /**
+   * If true, clear saved progress when the tour is completed (reaches the last step).
+   * @default true
+   */
+  clearOnComplete?: boolean;
+  /**
+   * Maximum age (in milliseconds) for saved progress. Progress older than this
+   * will be ignored and cleared.
+   * @default undefined (no expiration)
+   * @example 7 * 24 * 60 * 60 * 1000 // 7 days
+   */
+  maxAge?: number;
+}
+
 export interface TourConfig {
   /**
    * Animation configuration for the spotlight movement.
@@ -244,15 +297,22 @@ export interface TourConfig {
    * Can be overridden per-step via TourStep.spotlightStyle or TourZone props.
    */
   spotlightStyle?: SpotlightStyle;
+  /**
+   * Persistence configuration for saving/restoring tour progress.
+   * Supports MMKV v4 and AsyncStorage out of the box.
+   */
+  persistence?: TourPersistenceConfig;
 }
 
 export interface TourContextType {
   /**
    * Starts the tour at the first step or a specific step (by key).
+   * If persistence is enabled and autoResume is true, will resume from saved progress.
    */
   start: (stepKey?: string) => void;
   /**
    * Stops the tour and hides the overlay.
+   * Does NOT clear saved progress (use clearProgress for that).
    */
   stop: () => void;
   /**
@@ -292,6 +352,16 @@ export interface TourContextType {
    * Registers the main ScrollView ref for auto-scrolling
    */
   setScrollViewRef: (ref: any) => void;
+  /**
+   * Clears any saved tour progress from storage.
+   * Only available when persistence is enabled.
+   */
+  clearProgress: () => Promise<void>;
+  /**
+   * Whether there is saved progress available to resume.
+   * Only meaningful when persistence is enabled.
+   */
+  hasSavedProgress: boolean;
 }
 
 export interface InternalTourContextType extends TourContextType {

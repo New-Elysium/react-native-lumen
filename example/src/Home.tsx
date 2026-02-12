@@ -31,7 +31,7 @@ const Card = ({
 );
 
 export const Home = () => {
-  const { start, scrollViewRef } = useTour();
+  const { start, scrollViewRef, hasSavedProgress, clearProgress } = useTour();
   const [bio, setBio] = useState(
     'Passionate developer with 5+ years of experience in React Native and mobile app development. Love creating intuitive user experiences!'
   );
@@ -384,12 +384,33 @@ export const Home = () => {
         </TourZone>
       </View>
 
-      <Pressable
-        style={styles.startButton}
-        onPress={() => start(tourSteps.welcome.key)}
-      >
-        <Text style={styles.startButtonText}>Start Enhanced Tour</Text>
-      </Pressable>
+      {/* Show different button based on saved progress */}
+      {hasSavedProgress ? (
+        <View style={styles.buttonRow}>
+          <Pressable
+            style={[styles.startButton, styles.resumeButton]}
+            onPress={() => start()} // Will auto-resume from saved step
+          >
+            <Text style={styles.startButtonText}>Resume Tour</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.startButton, styles.restartButton]}
+            onPress={async () => {
+              await clearProgress();
+              start(tourSteps.welcome.key);
+            }}
+          >
+            <Text style={styles.startButtonText}>Restart</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable
+          style={styles.startButton}
+          onPress={() => start(tourSteps.welcome.key)}
+        >
+          <Text style={styles.startButtonText}>Start Enhanced Tour</Text>
+        </Pressable>
+      )}
     </Animated.ScrollView>
   );
 };
@@ -540,6 +561,18 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  resumeButton: {
+    flex: 1,
+    backgroundColor: '#6C5CE7',
+  },
+  restartButton: {
+    flex: 1,
+    backgroundColor: '#636E72',
   },
   // Enhanced Profile Styles
   profileCard: {
