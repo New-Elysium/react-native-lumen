@@ -31,7 +31,7 @@ const Card = ({
 );
 
 export const Home = () => {
-  const { start, scrollViewRef } = useTour();
+  const { start, scrollViewRef, hasSavedProgress, clearProgress } = useTour();
   const [bio, setBio] = useState(
     'Passionate developer with 5+ years of experience in React Native and mobile app development. Love creating intuitive user experiences!'
   );
@@ -63,7 +63,7 @@ export const Home = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Profile</Text>
 
-          {/* Profile Header */}
+          {/* Profile Header - demonstrating per-zone spotlight props */}
           <TourZone
             stepKey={tourSteps.profile.key}
             name={tourSteps.profile.name}
@@ -71,6 +71,10 @@ export const Home = () => {
             description={tourSteps.profile.description}
             borderRadius={16}
             style={styles.profileCard}
+            // Per-zone spotlight customization
+            spotlightGlowColor="#6C5CE7"
+            spotlightBorderColor="#6C5CE7"
+            spotlightPadding={12}
           >
             <View style={styles.profileHeader}>
               <View style={styles.avatarLarge}>
@@ -185,12 +189,17 @@ export const Home = () => {
       </View>
 
       <View style={styles.actionContainer}>
+        {/* Circle spotlight shape for FAB */}
         <TourZone
           stepKey={tourSteps.action.key}
           name={tourSteps.action.name}
           order={tourSteps.action.order}
           description={tourSteps.action.description}
           borderRadius={30}
+          spotlightShape="circle"
+          spotlightGlowColor="#6C5CE7"
+          spotlightGlowOpacity={0.6}
+          spotlightGlowRadius={16}
         >
           <Pressable style={styles.fab} onPress={() => console.log('Action')}>
             <Plus color="white" size={28} />
@@ -200,13 +209,15 @@ export const Home = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Team Members</Text>
+        {/* Pill spotlight shape for avatar row */}
         <TourZone
           stepKey={tourSteps.users.key}
           name={tourSteps.users.name}
           order={tourSteps.users.order}
           description={tourSteps.users.description}
-          shape="rect"
+          spotlightShape="pill"
           borderRadius={24}
+          spotlightPadding={8}
         >
           <View style={styles.avatarRow}>
             {[1, 2, 3, 4, 5, 6, 7].map((i) => (
@@ -229,12 +240,16 @@ export const Home = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Categories</Text>
+        {/* Pill shape with blue accent */}
         <TourZone
           stepKey={tourSteps.tags.key}
           name={tourSteps.tags.name}
           order={tourSteps.tags.order}
           description={tourSteps.tags.description}
           borderRadius={20}
+          spotlightShape="pill"
+          spotlightBorderColor="#0984e3"
+          spotlightGlowColor="#0984e3"
         >
           <View style={styles.tagContainer}>
             {['Design', 'Product', 'Marketing'].map((tag, i) => (
@@ -369,12 +384,33 @@ export const Home = () => {
         </TourZone>
       </View>
 
-      <Pressable
-        style={styles.startButton}
-        onPress={() => start(tourSteps.welcome.key)}
-      >
-        <Text style={styles.startButtonText}>Start Enhanced Tour</Text>
-      </Pressable>
+      {/* Show different button based on saved progress */}
+      {hasSavedProgress ? (
+        <View style={styles.buttonRow}>
+          <Pressable
+            style={[styles.startButton, styles.resumeButton]}
+            onPress={() => start()} // Will auto-resume from saved step
+          >
+            <Text style={styles.startButtonText}>Resume Tour</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.startButton, styles.restartButton]}
+            onPress={async () => {
+              await clearProgress();
+              start(tourSteps.welcome.key);
+            }}
+          >
+            <Text style={styles.startButtonText}>Restart</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable
+          style={styles.startButton}
+          onPress={() => start(tourSteps.welcome.key)}
+        >
+          <Text style={styles.startButtonText}>Start Enhanced Tour</Text>
+        </Pressable>
+      )}
     </Animated.ScrollView>
   );
 };
@@ -525,6 +561,18 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  resumeButton: {
+    flex: 1,
+    backgroundColor: '#6C5CE7',
+  },
+  restartButton: {
+    flex: 1,
+    backgroundColor: '#636E72',
   },
   // Enhanced Profile Styles
   profileCard: {

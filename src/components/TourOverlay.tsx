@@ -1,5 +1,5 @@
-import { memo, type ComponentType } from 'react';
-import { StyleSheet, Dimensions } from 'react-native';
+import { memo, type ComponentType, useMemo } from 'react';
+import { StyleSheet, Dimensions, Platform } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import Animated, {
   useAnimatedProps,
@@ -7,6 +7,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useTour } from '../hooks/useTour';
 import type { InternalTourContextType } from '../types';
+import { DEFAULT_SPOTLIGHT_STYLE } from '../constants/defaults';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -49,10 +50,21 @@ export const TourOverlay = memo(() => {
     targetHeight,
     targetRadius,
     opacity,
+    spotlightBorderWidth,
     config,
     currentStep,
     steps,
+    currentSpotlightStyle,
   } = useTour() as InternalTourContextType;
+
+  // Get resolved spotlight style for styling the glow/border
+  const spotlightStyle = useMemo(() => {
+    return {
+      ...DEFAULT_SPOTLIGHT_STYLE,
+      ...config?.spotlightStyle,
+      ...currentSpotlightStyle,
+    };
+  }, [config?.spotlightStyle, currentSpotlightStyle]);
 
   // Create the d string for the mask
   // Outer rectangle covers the whole screen
@@ -125,6 +137,33 @@ export const TourOverlay = memo(() => {
     };
   });
 
+  // Animated style for the spotlight border/glow ring
+  const spotlightBorderStyle = useAnimatedStyle(() => {
+    const borderW = spotlightBorderWidth?.value ?? spotlightStyle.borderWidth;
+
+    return {
+      position: 'absolute' as const,
+      left: targetX.value,
+      top: targetY.value,
+      width: targetWidth.value,
+      height: targetHeight.value,
+      borderRadius: targetRadius.value,
+      borderWidth: borderW,
+      borderColor: spotlightStyle.borderColor,
+      backgroundColor: 'transparent',
+      // Glow effect using shadow
+      shadowColor: spotlightStyle.glowColor,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: spotlightStyle.glowOpacity,
+      shadowRadius: spotlightStyle.glowRadius,
+      elevation: Platform.OS === 'android' ? 8 : 0,
+    };
+  });
+
+  // Determine if we should show the border/glow
+  const showBorder =
+    spotlightStyle.borderWidth > 0 || spotlightStyle.glowOpacity > 0;
+
   return (
     <AnimatedView
       pointerEvents={containerPointerEvents}
@@ -147,6 +186,10 @@ export const TourOverlay = memo(() => {
           pointerEvents="auto" // Catch touches
           // backgroundColor="transparent" // Default
         />
+      )}
+      {/* Border/Glow ring around the spotlight */}
+      {showBorder && currentStep && (
+        <AnimatedView style={spotlightBorderStyle} pointerEvents="none" />
       )}
     </AnimatedView>
   );

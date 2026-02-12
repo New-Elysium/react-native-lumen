@@ -2,6 +2,88 @@ import type { WithSpringConfig, SharedValue } from 'react-native-reanimated';
 import React from 'react';
 import type { ViewStyle, TextStyle } from 'react-native';
 
+// ─── Spotlight Customization Types ───────────────────────────────────────────
+
+/**
+ * Shape variants for the spotlight cutout.
+ */
+export type SpotlightShape = 'rounded-rect' | 'circle' | 'pill';
+
+/**
+ * Customization options for the spotlight appearance.
+ * Can be set globally via TourConfig or per-step via TourStep/TourZone.
+ */
+export interface SpotlightStyle {
+  /**
+   * Uniform padding around the highlighted element.
+   * @default 8
+   */
+  padding?: number;
+  /**
+   * Top padding (overrides `padding` for top side).
+   */
+  paddingTop?: number;
+  /**
+   * Right padding (overrides `padding` for right side).
+   */
+  paddingRight?: number;
+  /**
+   * Bottom padding (overrides `padding` for bottom side).
+   */
+  paddingBottom?: number;
+  /**
+   * Left padding (overrides `padding` for left side).
+   */
+  paddingLeft?: number;
+  /**
+   * Border radius of the spotlight (for 'rounded-rect' shape).
+   * @default 10
+   */
+  borderRadius?: number;
+  /**
+   * Shape of the spotlight cutout.
+   * - 'rounded-rect': Standard rounded rectangle (default)
+   * - 'circle': Circular spotlight that encompasses the element
+   * - 'pill': Pill/capsule shape with fully rounded ends
+   * @default 'rounded-rect'
+   */
+  shape?: SpotlightShape;
+  /**
+   * Width of the border/glow ring around the spotlight.
+   * Set to 0 to disable.
+   * @default 2
+   */
+  borderWidth?: number;
+  /**
+   * Color of the border/glow ring.
+   * @default '#007AFF'
+   */
+  borderColor?: string;
+  /**
+   * Color of the outer glow effect.
+   * @default '#007AFF'
+   */
+  glowColor?: string;
+  /**
+   * Opacity of the glow effect (0-1).
+   * @default 0.4
+   */
+  glowOpacity?: number;
+  /**
+   * Blur radius for the glow effect.
+   * @default 8
+   */
+  glowRadius?: number;
+  /**
+   * Spring damping for spotlight animations (per-step override).
+   */
+  springDamping?: number;
+  /**
+   * Spring stiffness for spotlight animations (per-step override).
+   */
+  springStiffness?: number;
+}
+
 export interface TourStep {
   /**
    * Unique key for this step.
@@ -28,6 +110,16 @@ export interface TourStep {
    * If false, interactions are blocked (default behavior depends on global config).
    */
   clickable?: boolean;
+  /**
+   * Per-step spotlight style overrides.
+   * Merged with global spotlightStyle from TourConfig.
+   */
+  spotlightStyle?: SpotlightStyle;
+  /**
+   * Custom render function for this step's tooltip/card.
+   * Overrides the global renderCard from TourConfig.
+   */
+  renderCustomCard?: (props: CardProps) => React.ReactNode;
 }
 
 export interface MeasureResult {
@@ -121,6 +213,59 @@ export interface CardProps {
   labels?: TourLabels;
 }
 
+// ─── Persistence Types ───────────────────────────────────────────────────────
+
+/**
+ * Storage adapter interface for tour persistence.
+ * Compatible with MMKV v4 and AsyncStorage APIs.
+ */
+export interface StorageAdapter {
+  getItem: (key: string) => Promise<string | null> | string | null;
+  setItem: (key: string, value: string) => Promise<void> | void;
+  removeItem: (key: string) => Promise<void> | void;
+}
+
+/**
+ * Configuration for tour progress persistence.
+ */
+export interface TourPersistenceConfig {
+  /**
+   * Enable persistence. When true, the library will auto-detect available storage
+   * (MMKV v4 or AsyncStorage) and save/restore tour progress.
+   * @default false
+   */
+  enabled: boolean;
+  /**
+   * Unique identifier for this tour. Used as the storage key.
+   * Required when persistence is enabled.
+   * @example 'onboarding-tour' or 'feature-tour-v2'
+   */
+  tourId: string;
+  /**
+   * Custom storage adapter. If not provided, the library will auto-detect
+   * MMKV v4 or AsyncStorage.
+   */
+  storage?: StorageAdapter;
+  /**
+   * If true, automatically resume the tour from the saved step when start() is called
+   * without a specific step key.
+   * @default true
+   */
+  autoResume?: boolean;
+  /**
+   * If true, clear saved progress when the tour is completed (reaches the last step).
+   * @default true
+   */
+  clearOnComplete?: boolean;
+  /**
+   * Maximum age (in milliseconds) for saved progress. Progress older than this
+   * will be ignored and cleared.
+   * @default undefined (no expiration)
+   * @example 7 * 24 * 60 * 60 * 1000 // 7 days
+   */
+  maxAge?: number;
+}
+
 export interface TourConfig {
   /**
    * Animation configuration for the spotlight movement.
@@ -147,15 +292,27 @@ export interface TourConfig {
    * Custom styles for the tooltip appearance
    */
   tooltipStyles?: TooltipStyles;
+  /**
+   * Global spotlight style settings.
+   * Can be overridden per-step via TourStep.spotlightStyle or TourZone props.
+   */
+  spotlightStyle?: SpotlightStyle;
+  /**
+   * Persistence configuration for saving/restoring tour progress.
+   * Supports MMKV v4 and AsyncStorage out of the box.
+   */
+  persistence?: TourPersistenceConfig;
 }
 
 export interface TourContextType {
   /**
    * Starts the tour at the first step or a specific step (by key).
+   * If persistence is enabled and autoResume is true, will resume from saved progress.
    */
   start: (stepKey?: string) => void;
   /**
    * Stops the tour and hides the overlay.
+   * Does NOT clear saved progress (use clearProgress for that).
    */
   stop: () => void;
   /**
@@ -195,6 +352,16 @@ export interface TourContextType {
    * Registers the main ScrollView ref for auto-scrolling
    */
   setScrollViewRef: (ref: any) => void;
+  /**
+   * Clears any saved tour progress from storage.
+   * Only available when persistence is enabled.
+   */
+  clearProgress: () => Promise<void>;
+  /**
+   * Whether there is saved progress available to resume.
+   * Only meaningful when persistence is enabled.
+   */
+  hasSavedProgress: boolean;
 }
 
 export interface InternalTourContextType extends TourContextType {
@@ -204,7 +371,11 @@ export interface InternalTourContextType extends TourContextType {
   targetHeight: SharedValue<number>;
   targetRadius: SharedValue<number>;
   opacity: SharedValue<number>;
+  /** Border width for the spotlight glow ring */
+  spotlightBorderWidth: SharedValue<number>;
   containerRef: React.RefObject<any>;
   scrollViewRef: React.RefObject<any>;
   setScrollViewRef: (ref: any) => void;
+  /** Resolved spotlight style for the current step */
+  currentSpotlightStyle: SpotlightStyle | null;
 }
