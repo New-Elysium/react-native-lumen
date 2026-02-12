@@ -2,6 +2,88 @@ import type { WithSpringConfig, SharedValue } from 'react-native-reanimated';
 import React from 'react';
 import type { ViewStyle, TextStyle } from 'react-native';
 
+// ─── Spotlight Customization Types ───────────────────────────────────────────
+
+/**
+ * Shape variants for the spotlight cutout.
+ */
+export type SpotlightShape = 'rounded-rect' | 'circle' | 'pill';
+
+/**
+ * Customization options for the spotlight appearance.
+ * Can be set globally via TourConfig or per-step via TourStep/TourZone.
+ */
+export interface SpotlightStyle {
+  /**
+   * Uniform padding around the highlighted element.
+   * @default 8
+   */
+  padding?: number;
+  /**
+   * Top padding (overrides `padding` for top side).
+   */
+  paddingTop?: number;
+  /**
+   * Right padding (overrides `padding` for right side).
+   */
+  paddingRight?: number;
+  /**
+   * Bottom padding (overrides `padding` for bottom side).
+   */
+  paddingBottom?: number;
+  /**
+   * Left padding (overrides `padding` for left side).
+   */
+  paddingLeft?: number;
+  /**
+   * Border radius of the spotlight (for 'rounded-rect' shape).
+   * @default 10
+   */
+  borderRadius?: number;
+  /**
+   * Shape of the spotlight cutout.
+   * - 'rounded-rect': Standard rounded rectangle (default)
+   * - 'circle': Circular spotlight that encompasses the element
+   * - 'pill': Pill/capsule shape with fully rounded ends
+   * @default 'rounded-rect'
+   */
+  shape?: SpotlightShape;
+  /**
+   * Width of the border/glow ring around the spotlight.
+   * Set to 0 to disable.
+   * @default 2
+   */
+  borderWidth?: number;
+  /**
+   * Color of the border/glow ring.
+   * @default '#007AFF'
+   */
+  borderColor?: string;
+  /**
+   * Color of the outer glow effect.
+   * @default '#007AFF'
+   */
+  glowColor?: string;
+  /**
+   * Opacity of the glow effect (0-1).
+   * @default 0.4
+   */
+  glowOpacity?: number;
+  /**
+   * Blur radius for the glow effect.
+   * @default 8
+   */
+  glowRadius?: number;
+  /**
+   * Spring damping for spotlight animations (per-step override).
+   */
+  springDamping?: number;
+  /**
+   * Spring stiffness for spotlight animations (per-step override).
+   */
+  springStiffness?: number;
+}
+
 export interface TourStep {
   /**
    * Unique key for this step.
@@ -28,6 +110,16 @@ export interface TourStep {
    * If false, interactions are blocked (default behavior depends on global config).
    */
   clickable?: boolean;
+  /**
+   * Per-step spotlight style overrides.
+   * Merged with global spotlightStyle from TourConfig.
+   */
+  spotlightStyle?: SpotlightStyle;
+  /**
+   * Custom render function for this step's tooltip/card.
+   * Overrides the global renderCard from TourConfig.
+   */
+  renderCustomCard?: (props: CardProps) => React.ReactNode;
 }
 
 export interface MeasureResult {
@@ -147,6 +239,11 @@ export interface TourConfig {
    * Custom styles for the tooltip appearance
    */
   tooltipStyles?: TooltipStyles;
+  /**
+   * Global spotlight style settings.
+   * Can be overridden per-step via TourStep.spotlightStyle or TourZone props.
+   */
+  spotlightStyle?: SpotlightStyle;
 }
 
 export interface TourContextType {
@@ -204,7 +301,11 @@ export interface InternalTourContextType extends TourContextType {
   targetHeight: SharedValue<number>;
   targetRadius: SharedValue<number>;
   opacity: SharedValue<number>;
+  /** Border width for the spotlight glow ring */
+  spotlightBorderWidth: SharedValue<number>;
   containerRef: React.RefObject<any>;
   scrollViewRef: React.RefObject<any>;
   setScrollViewRef: (ref: any) => void;
+  /** Resolved spotlight style for the current step */
+  currentSpotlightStyle: SpotlightStyle | null;
 }

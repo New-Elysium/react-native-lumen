@@ -11,13 +11,15 @@ import {
   withTiming,
   useAnimatedRef,
   default as Animated,
+  type WithSpringConfig,
 } from 'react-native-reanimated';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Dimensions } from 'react-native';
 import type {
   TourStep,
   MeasureResult,
   TourConfig,
   InternalTourContextType,
+  SpotlightStyle,
 } from '../types';
 import { TourContext } from '../context/TourContext';
 import { TourOverlay } from './TourOverlay';
@@ -25,7 +27,84 @@ import { TourTooltip } from './TourTooltip';
 import {
   DEFAULT_BACKDROP_OPACITY,
   DEFAULT_SPRING_CONFIG,
+  DEFAULT_SPOTLIGHT_STYLE,
+  resolveSpotlightStyle,
 } from '../constants/defaults';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+/**
+ * Computes the spotlight geometry based on element bounds and spotlight style.
+ * Handles different shapes: rounded-rect, circle, pill.
+ */
+function computeSpotlightGeometry(
+  element: MeasureResult,
+  style: Required<SpotlightStyle>
+): {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  borderRadius: number;
+} {
+  const {
+    paddingTop,
+    paddingRight,
+    paddingBottom,
+    paddingLeft,
+    shape,
+    borderRadius,
+  } = style;
+
+  let sx: number, sy: number, sw: number, sh: number, sr: number;
+
+  switch (shape) {
+    case 'circle': {
+      // Create a circular spotlight that encompasses the element
+      const cx = element.x + element.width / 2;
+      const cy = element.y + element.height / 2;
+      const radius =
+        Math.sqrt(element.width ** 2 + element.height ** 2) / 2 + style.padding;
+      sx = cx - radius;
+      sy = cy - radius;
+      sw = radius * 2;
+      sh = radius * 2;
+      sr = radius;
+      break;
+    }
+    case 'pill': {
+      // Pill shape with fully rounded ends
+      sx = element.x - paddingLeft;
+      sy = element.y - paddingTop;
+      sw = element.width + paddingLeft + paddingRight;
+      sh = element.height + paddingTop + paddingBottom;
+      sr = sh / 2; // Fully rounded based on height
+      break;
+    }
+    case 'rounded-rect':
+    default: {
+      sx = element.x - paddingLeft;
+      sy = element.y - paddingTop;
+      sw = element.width + paddingLeft + paddingRight;
+      sh = element.height + paddingTop + paddingBottom;
+      sr = borderRadius;
+      break;
+    }
+  }
+
+  // Clamp to screen bounds
+  sx = Math.max(0, Math.min(sx, SCREEN_WIDTH - sw));
+  sy = Math.max(0, Math.min(sy, SCREEN_HEIGHT - sh));
+  sw = Math.min(sw, SCREEN_WIDTH - sx);
+  sh = Math.min(sh, SCREEN_HEIGHT - sy);
+
+  // Ensure minimum size
+  const minSize = 40;
+  sw = Math.max(sw, minSize);
+  sh = Math.max(sh, minSize);
+
+  return { x: sx, y: sy, width: sw, height: sh, borderRadius: sr };
+}
 
 interface TourProviderProps {
   children: React.ReactNode;
@@ -66,6 +145,43 @@ export const TourProvider: React.FC<TourProviderProps> = ({
   const targetHeight = useSharedValue(0);
   const targetRadius = useSharedValue(10); // Default border radius
   const opacity = useSharedValue(0); // 0 = hidden, 1 = visible
+  const spotlightBorderWidth = useSharedValue(
+    DEFAULT_SPOTLIGHT_STYLE.borderWidth
+  );
+
+  // Track current step's resolved spotlight style
+  const currentSpotlightStyle = useMemo<SpotlightStyle | null>(() => {
+    if (!currentStep) return null;
+    const step = steps[currentStep];
+    if (!step) return null;
+    return resolveSpotlightStyle(config?.spotlightStyle, step.spotlightStyle);
+  }, [currentStep, steps, config?.spotlightStyle]);
+
+  // Helper to get spring config for a step (supports per-step overrides)
+  const getSpringConfigForStep = useCallback(
+    (stepKey: string): WithSpringConfig => {
+      const step = steps[stepKey];
+      const stepStyle = step?.spotlightStyle;
+      const baseConfig = config?.springConfig ?? DEFAULT_SPRING_CONFIG;
+
+      // Allow per-step spring overrides
+      if (
+        stepStyle?.springDamping !== undefined ||
+        stepStyle?.springStiffness !== undefined
+      ) {
+        return {
+          damping: stepStyle.springDamping ?? baseConfig.damping,
+          stiffness: stepStyle.springStiffness ?? baseConfig.stiffness,
+          mass: baseConfig.mass,
+          overshootClamping: baseConfig.overshootClamping,
+          restDisplacementThreshold: baseConfig.restDisplacementThreshold,
+          restSpeedThreshold: baseConfig.restSpeedThreshold,
+        };
+      }
+      return baseConfig;
+    },
+    [steps, config?.springConfig]
+  );
 
   // Helper to animate to a specific step's layout
   const animateToStep = useCallback(
@@ -91,19 +207,25 @@ export const TourProvider: React.FC<TourProviderProps> = ({
           return;
         }
 
-        const springConfig = config?.springConfig ?? DEFAULT_SPRING_CONFIG;
-
-        targetX.value = withSpring(measure.x, springConfig);
-        targetY.value = withSpring(measure.y, springConfig);
-        targetWidth.value = withSpring(measure.width, springConfig);
-        targetHeight.value = withSpring(measure.height, springConfig);
-
-        // If measure result has radius or step meta has radius, use it.
-        // For now defaulting to 10 or meta reading if we passed it back in measure?
-        // Let's assume meta is in steps state.
         const step = steps[stepKey];
-        const radius = step?.meta?.borderRadius ?? 10;
-        targetRadius.value = withSpring(radius, springConfig);
+        const resolvedStyle = resolveSpotlightStyle(
+          config?.spotlightStyle,
+          step?.spotlightStyle
+        );
+        const springConfig = getSpringConfigForStep(stepKey);
+
+        // Compute spotlight geometry based on style (handles shapes and padding)
+        const geo = computeSpotlightGeometry(measure, resolvedStyle);
+
+        targetX.value = withSpring(geo.x, springConfig);
+        targetY.value = withSpring(geo.y, springConfig);
+        targetWidth.value = withSpring(geo.width, springConfig);
+        targetHeight.value = withSpring(geo.height, springConfig);
+        targetRadius.value = withSpring(geo.borderRadius, springConfig);
+        spotlightBorderWidth.value = withSpring(
+          resolvedStyle.borderWidth,
+          springConfig
+        );
 
         // Ensure overlay is visible
         opacity.value = withTiming(backdropOpacity, { duration: 300 });
@@ -118,9 +240,11 @@ export const TourProvider: React.FC<TourProviderProps> = ({
       targetWidth,
       targetHeight,
       targetRadius,
+      spotlightBorderWidth,
       opacity,
-      config?.springConfig,
+      getSpringConfigForStep,
       steps,
+      config?.spotlightStyle,
     ]
   );
 
@@ -164,17 +288,25 @@ export const TourProvider: React.FC<TourProviderProps> = ({
       measurements.current[key] = measure;
       // If this step is currently active (e.g. scroll happened or resize), update shared values on the fly
       if (currentStep === key) {
-        const springConfig = config?.springConfig ?? DEFAULT_SPRING_CONFIG;
-
-        targetX.value = withSpring(measure.x, springConfig);
-        targetY.value = withSpring(measure.y, springConfig);
-        targetWidth.value = withSpring(measure.width, springConfig);
-        targetHeight.value = withSpring(measure.height, springConfig);
-
-        // Update radius if available
         const step = steps[key];
-        const radius = step?.meta?.borderRadius ?? 10;
-        targetRadius.value = withSpring(radius, springConfig);
+        const resolvedStyle = resolveSpotlightStyle(
+          config?.spotlightStyle,
+          step?.spotlightStyle
+        );
+        const springConfig = getSpringConfigForStep(key);
+
+        // Compute spotlight geometry based on style
+        const geo = computeSpotlightGeometry(measure, resolvedStyle);
+
+        targetX.value = withSpring(geo.x, springConfig);
+        targetY.value = withSpring(geo.y, springConfig);
+        targetWidth.value = withSpring(geo.width, springConfig);
+        targetHeight.value = withSpring(geo.height, springConfig);
+        targetRadius.value = withSpring(geo.borderRadius, springConfig);
+        spotlightBorderWidth.value = withSpring(
+          resolvedStyle.borderWidth,
+          springConfig
+        );
 
         // Ensure overlay is visible (fixes race condition where start() was called before measure)
         opacity.value = withTiming(backdropOpacity, { duration: 300 });
@@ -187,9 +319,11 @@ export const TourProvider: React.FC<TourProviderProps> = ({
       targetWidth,
       targetHeight,
       targetRadius,
+      spotlightBorderWidth,
       opacity,
       backdropOpacity,
-      config?.springConfig,
+      getSpringConfigForStep,
+      config?.spotlightStyle,
       steps,
     ]
   );
@@ -308,11 +442,13 @@ export const TourProvider: React.FC<TourProviderProps> = ({
       targetHeight,
       targetRadius,
       opacity,
+      spotlightBorderWidth,
       steps,
       config,
       containerRef,
       scrollViewRef,
       setScrollViewRef,
+      currentSpotlightStyle,
     }),
     [
       start,
@@ -329,11 +465,13 @@ export const TourProvider: React.FC<TourProviderProps> = ({
       targetHeight,
       targetRadius,
       opacity,
+      spotlightBorderWidth,
       steps,
       config,
       containerRef,
       scrollViewRef,
       setScrollViewRef,
+      currentSpotlightStyle,
     ]
   );
 

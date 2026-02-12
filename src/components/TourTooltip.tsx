@@ -187,19 +187,39 @@ export const TourTooltip = memo(() => {
     }
   };
 
-  // Custom Render
+  // Build card props for custom renders
+  const cardProps: CardProps = {
+    step: currentStepData,
+    currentStepIndex: currentIndex,
+    totalSteps,
+    next,
+    prev,
+    stop,
+    isFirst,
+    isLast,
+    labels: config?.labels,
+  };
+
+  // Priority: Per-step custom card > Global custom card > Default card
+  // 1. Per-step custom render (highest priority)
+  if (currentStepData.renderCustomCard) {
+    return (
+      <AnimatedView
+        style={[
+          styles.container,
+          tooltipStyle,
+          // Reset styles for custom render so the user has full control
+          styles.resetStyle,
+        ]}
+        onLayout={handleTooltipLayout}
+      >
+        {currentStepData.renderCustomCard(cardProps)}
+      </AnimatedView>
+    );
+  }
+
+  // 2. Global custom render
   if (config?.renderCard) {
-    const cardProps: CardProps = {
-      step: currentStepData,
-      currentStepIndex: currentIndex,
-      totalSteps,
-      next,
-      prev,
-      stop,
-      isFirst,
-      isLast,
-      labels: config.labels,
-    };
     return (
       <AnimatedView
         style={[
@@ -215,7 +235,7 @@ export const TourTooltip = memo(() => {
     );
   }
 
-  // Default Render
+  // 3. Default Render
   const labels = { ...DEFAULT_LABELS, ...config?.labels };
   const labelNext = isLast ? labels.finish : labels.next;
   const labelSkip = labels.skip;

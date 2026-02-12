@@ -2,6 +2,7 @@ import React, {
   useEffect,
   useCallback,
   useRef,
+  useMemo,
   type ComponentType,
 } from 'react';
 import type { ViewStyle, StyleProp } from 'react-native';
@@ -16,22 +17,68 @@ import {
   useSharedValue,
 } from 'react-native-reanimated';
 import { Dimensions } from 'react-native';
-import type { InternalTourContextType } from '../types';
+import type {
+  InternalTourContextType,
+  SpotlightStyle,
+  SpotlightShape,
+  CardProps,
+} from '../types';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const AnimatedView = Animated.View as unknown as ComponentType<any>;
 
 interface TourZoneProps {
+  /** Unique identifier for this step */
   stepKey: string;
+  /** Display name shown in tooltip */
   name?: string;
+  /** Description text shown in tooltip */
   description: string;
+  /** Order of appearance in the tour */
   order?: number;
+  /**
+   * @deprecated Use `spotlightShape` instead
+   */
   shape?: 'rect' | 'circle';
+  /**
+   * Shape of the spotlight cutout.
+   * - 'rounded-rect': Standard rounded rectangle (default)
+   * - 'circle': Circular spotlight that encompasses the element
+   * - 'pill': Pill/capsule shape with fully rounded ends
+   */
+  spotlightShape?: SpotlightShape;
+  /** Border radius of the spotlight (for 'rounded-rect' shape) */
   borderRadius?: number;
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
+  /** If true, allows user interaction with the target element */
   clickable?: boolean;
+  // ─── Spotlight Style Props ─────────────────────────────────────────────
+  /** Uniform padding around the highlighted element */
+  spotlightPadding?: number;
+  /** Top padding for the spotlight */
+  spotlightPaddingTop?: number;
+  /** Right padding for the spotlight */
+  spotlightPaddingRight?: number;
+  /** Bottom padding for the spotlight */
+  spotlightPaddingBottom?: number;
+  /** Left padding for the spotlight */
+  spotlightPaddingLeft?: number;
+  /** Width of the border/glow ring around the spotlight */
+  spotlightBorderWidth?: number;
+  /** Color of the border/glow ring */
+  spotlightBorderColor?: string;
+  /** Color of the outer glow effect */
+  spotlightGlowColor?: string;
+  /** Opacity of the glow effect (0-1) */
+  spotlightGlowOpacity?: number;
+  /** Blur radius for the glow effect */
+  spotlightGlowRadius?: number;
+  /** Complete spotlight style object (alternative to individual props) */
+  spotlightStyle?: SpotlightStyle;
+  /** Custom render function for this step's tooltip/card */
+  renderCustomCard?: (props: CardProps) => React.ReactNode;
 }
 
 export const TourZone: React.FC<TourZoneProps> = ({
@@ -40,10 +87,24 @@ export const TourZone: React.FC<TourZoneProps> = ({
   description,
   order,
   shape = 'rect',
+  spotlightShape,
   borderRadius = 10,
   children,
   style,
   clickable,
+  // Spotlight style props
+  spotlightPadding,
+  spotlightPaddingTop,
+  spotlightPaddingRight,
+  spotlightPaddingBottom,
+  spotlightPaddingLeft,
+  spotlightBorderWidth,
+  spotlightBorderColor,
+  spotlightGlowColor,
+  spotlightGlowOpacity,
+  spotlightGlowRadius,
+  spotlightStyle,
+  renderCustomCard,
 }) => {
   const {
     registerStep,
@@ -335,6 +396,62 @@ export const TourZone: React.FC<TourZoneProps> = ({
     measureJS();
   };
 
+  // Build the spotlight style from individual props or the spotlightStyle object
+  // Memoize to satisfy exhaustive-deps and prevent unnecessary re-renders
+  const resolvedSpotlightStyle: SpotlightStyle = useMemo(
+    () => ({
+      ...spotlightStyle,
+      // Individual props override spotlightStyle object
+      ...(spotlightPadding !== undefined && { padding: spotlightPadding }),
+      ...(spotlightPaddingTop !== undefined && {
+        paddingTop: spotlightPaddingTop,
+      }),
+      ...(spotlightPaddingRight !== undefined && {
+        paddingRight: spotlightPaddingRight,
+      }),
+      ...(spotlightPaddingBottom !== undefined && {
+        paddingBottom: spotlightPaddingBottom,
+      }),
+      ...(spotlightPaddingLeft !== undefined && {
+        paddingLeft: spotlightPaddingLeft,
+      }),
+      ...(spotlightBorderWidth !== undefined && {
+        borderWidth: spotlightBorderWidth,
+      }),
+      ...(spotlightBorderColor !== undefined && {
+        borderColor: spotlightBorderColor,
+      }),
+      ...(spotlightGlowColor !== undefined && {
+        glowColor: spotlightGlowColor,
+      }),
+      ...(spotlightGlowOpacity !== undefined && {
+        glowOpacity: spotlightGlowOpacity,
+      }),
+      ...(spotlightGlowRadius !== undefined && {
+        glowRadius: spotlightGlowRadius,
+      }),
+      // Shape: prefer spotlightShape, fall back to legacy shape prop conversion
+      shape: spotlightShape ?? (shape === 'circle' ? 'circle' : 'rounded-rect'),
+      borderRadius,
+    }),
+    [
+      spotlightStyle,
+      spotlightPadding,
+      spotlightPaddingTop,
+      spotlightPaddingRight,
+      spotlightPaddingBottom,
+      spotlightPaddingLeft,
+      spotlightBorderWidth,
+      spotlightBorderColor,
+      spotlightGlowColor,
+      spotlightGlowOpacity,
+      spotlightGlowRadius,
+      spotlightShape,
+      shape,
+      borderRadius,
+    ]
+  );
+
   // Register step on mount
   useEffect(() => {
     registerStep({
@@ -343,7 +460,9 @@ export const TourZone: React.FC<TourZoneProps> = ({
       description,
       order,
       clickable,
-      meta: { shape, borderRadius },
+      meta: { shape: resolvedSpotlightStyle.shape, borderRadius },
+      spotlightStyle: resolvedSpotlightStyle,
+      renderCustomCard,
     });
     return () => unregisterStep(stepKey);
   }, [
@@ -351,11 +470,12 @@ export const TourZone: React.FC<TourZoneProps> = ({
     name,
     description,
     order,
-    shape,
     borderRadius,
     registerStep,
     unregisterStep,
     clickable,
+    resolvedSpotlightStyle,
+    renderCustomCard,
   ]);
 
   return (

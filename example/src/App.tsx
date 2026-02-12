@@ -1,9 +1,24 @@
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { TourProvider, WigglySpringConfig } from 'react-native-lumen';
+import {
+  TourProvider,
+  WigglySpringConfig,
+  type SpotlightStyle,
+} from 'react-native-lumen';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Home } from './Home';
 import { tourSteps } from './data/tourSteps';
 import { StyleSheet } from 'react-native';
+
+// Global spotlight style - applied to all steps unless overridden
+const globalSpotlightStyle: SpotlightStyle = {
+  padding: 8,
+  borderRadius: 12,
+  borderWidth: 2,
+  borderColor: '#007AFF',
+  glowColor: '#007AFF',
+  glowOpacity: 0.4,
+  glowRadius: 8,
+};
 
 export default function App() {
   // Extract keys for order
@@ -26,6 +41,8 @@ export default function App() {
                 finish: 'Complete!',
                 skip: 'Skip Tour',
               },
+              // Global spotlight style - can be overridden per-step
+              spotlightStyle: globalSpotlightStyle,
             }}
           >
             <Home />

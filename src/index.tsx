@@ -6,3 +6,14 @@ export { TourOverlay } from './components/TourOverlay';
 export { TourTooltip } from './components/TourTooltip';
 export * from './constants/defaults';
 export * from './constants/animations';
+
+// Re-export specific types for convenience
+export type {
+  SpotlightStyle,
+  SpotlightShape,
+  TourStep,
+  CardProps,
+  TourConfig,
+  TourLabels,
+  TooltipStyles,
+} from './types';
