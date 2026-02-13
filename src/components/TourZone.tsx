@@ -55,6 +55,12 @@ interface TourZoneProps {
   /** If true, allows user interaction with the target element */
   clickable?: boolean;
   /**
+   * If true, prevents interaction with the underlying app for this specific step.
+   * Overrides the global preventInteraction setting from TourConfig.
+   * @default undefined (uses global setting)
+   */
+  preventInteraction?: boolean;
+  /**
    * If true, the skip button is hidden for this step.
    * The user must press next (or complete the action) to proceed.
    */
@@ -104,6 +110,7 @@ export const TourZone: React.FC<TourZoneProps> = ({
   children,
   style,
   clickable,
+  preventInteraction,
   required,
   completed,
   // Spotlight style props
@@ -474,6 +481,7 @@ export const TourZone: React.FC<TourZoneProps> = ({
       description,
       order,
       clickable,
+      preventInteraction,
       required,
       completed,
       meta: { shape: resolvedSpotlightStyle.shape, borderRadius },
@@ -490,6 +498,7 @@ export const TourZone: React.FC<TourZoneProps> = ({
     registerStep,
     unregisterStep,
     clickable,
+    preventInteraction,
     required,
     completed,
     resolvedSpotlightStyle,
