@@ -113,7 +113,8 @@ export const TourOverlay = memo(() => {
   //    - Overlay shouldn't block anything?
   //    - pointerEvents='none' on the whole container.
 
-  const shouldBlockOutside = config?.preventInteraction ?? false;
+  // Check per-step preventInteraction first, then fall back to global config
+  const shouldBlockOutside = step?.preventInteraction ?? config?.preventInteraction ?? false;
 
   // If we don't want to block outside, we just let everything pass.
   // But wait, if we let everything pass, we can't implement 'clickable=false' strictness?
