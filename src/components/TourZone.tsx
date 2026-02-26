@@ -473,7 +473,11 @@ export const TourZone: React.FC<TourZoneProps> = ({
     ]
   );
 
-  // Register step on mount and when enforcement props change
+  // Update step data whenever any prop changes. registerStep is an upsert, so
+  // this never removes the step — it only refreshes its data in the context.
+  // Keeping this separate from the unmount effect prevents a flicker where the
+  // step is briefly unregistered (and potentially hidden) every time `completed`
+  // or `required` changes while the tour is active on this step.
   useEffect(() => {
     registerStep({
       key: stepKey,
@@ -488,7 +492,6 @@ export const TourZone: React.FC<TourZoneProps> = ({
       spotlightStyle: resolvedSpotlightStyle,
       renderCustomCard,
     });
-    return () => unregisterStep(stepKey);
   }, [
     stepKey,
     name,
@@ -496,7 +499,6 @@ export const TourZone: React.FC<TourZoneProps> = ({
     order,
     borderRadius,
     registerStep,
-    unregisterStep,
     clickable,
     preventInteraction,
     required,
@@ -504,6 +506,14 @@ export const TourZone: React.FC<TourZoneProps> = ({
     resolvedSpotlightStyle,
     renderCustomCard,
   ]);
+
+  // Unregister only on true unmount (or when stepKey itself changes, which
+  // indicates this TourZone is being replaced by a different step entirely).
+  const stepKeyRef = useRef(stepKey);
+  stepKeyRef.current = stepKey;
+  useEffect(() => {
+    return () => unregisterStep(stepKeyRef.current);
+  }, [unregisterStep]);
 
   return (
     <AnimatedView
