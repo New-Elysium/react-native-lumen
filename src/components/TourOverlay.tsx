@@ -1,5 +1,5 @@
 import { memo, type ComponentType, useMemo } from 'react';
-import { StyleSheet, Dimensions, Platform } from 'react-native';
+import { StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import Animated, {
   useAnimatedProps,
@@ -8,8 +8,6 @@ import Animated, {
 import { useTour } from '../hooks/useTour';
 import type { InternalTourContextType } from '../types';
 import { DEFAULT_SPOTLIGHT_STYLE } from '../constants/defaults';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedView = Animated.View as unknown as ComponentType<any>;
@@ -43,6 +41,7 @@ const createRoundedRectPath = (
 };
 
 export const TourOverlay = memo(() => {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const {
     targetX,
     targetY,
@@ -97,33 +96,21 @@ export const TourOverlay = memo(() => {
   const step = currentStep ? steps[currentStep] : null;
   const isClickable = step?.clickable ?? false;
 
-  // Interaction Logic:
-  // 1. preventInteraction = true:
-  //    - Wrapper pointerEvents = 'box-none' (pass through) BUT SVG is auto?
-  //    - Actually, if we want to block OUTSIDE but allow INSIDE:
-  //      - SVG path normally blocks where it draws (the dark part).
-  //      - The 'hole' is empty, so touches pass through the hole to the app?
-  //      - YES, with fillRule="evenodd", the hole effectively has no fill.
-  //      - So if SVG is 'auto', touching the dark mask is blocked (if we consume touch).
-  //      - Touching the hole goes through to the app (GOOD for clickable).
-  //    - IF we want to BLOCK the hole (clickable=false):
-  //      - We need a transparent view covering the hole that consumes touches.
-  //
-  // 2. preventInteraction = false (default):
-  //    - Overlay shouldn't block anything?
-  //    - pointerEvents='none' on the whole container.
+  // Check per-step preventInteraction first, then fall back to global config.
+  // Defaults to true: the dark backdrop blocks touches by default.
+  const shouldBlockOutside = step?.preventInteraction ?? config?.preventInteraction ?? true;
 
-  // Check per-step preventInteraction first, then fall back to global config
-  const shouldBlockOutside = step?.preventInteraction ?? config?.preventInteraction ?? false;
-
-  // If we don't want to block outside, we just let everything pass.
-  // But wait, if we let everything pass, we can't implement 'clickable=false' strictness?
-  // Usually preventInteraction=false means "just show the highlighter, let user do whatever".
-
+  // 'box-none': container doesn't capture touches itself, but children (SVG, blocker) can.
+  // 'none': entire overlay is touch-transparent (backdrop is purely visual).
   const containerPointerEvents =
     shouldBlockOutside && currentStep ? 'box-none' : 'none';
 
-  // If blocking outside, the SVG (which is absolute fill) needs to catch touches on the dark part.
+  // SVG handles backdrop touch blocking at the native-view level via pointerEvents.
+  // 'auto': filled pixels (dark mask) absorb touches; the evenodd hole has no fill so
+  //         touches there pass through to the app — enabling clickable=true behaviour.
+  // 'none': SVG is purely visual; all touches pass through (preventInteraction=false mode).
+  const svgPointerEvents =
+    shouldBlockOutside && currentStep ? 'auto' : 'none';
 
   // Blocker style for the hole (only if NOT clickable)
   const blockerStyle = useAnimatedStyle(() => {
@@ -170,18 +157,20 @@ export const TourOverlay = memo(() => {
       pointerEvents={containerPointerEvents}
       style={StyleSheet.absoluteFill}
     >
-      <Svg height="100%" width="100%" style={StyleSheet.absoluteFill}>
+      <Svg
+        height="100%"
+        width="100%"
+        style={StyleSheet.absoluteFill}
+        pointerEvents={svgPointerEvents}
+      >
         <AnimatedPath
           animatedProps={animatedProps as any}
-          fill="black" // The backdrop color
+          fill="black"
           fillRule="evenodd"
-          onPress={() => {
-            // Consume touch on the backdrop?
-          }}
         />
       </Svg>
-      {/* If strictly blocking interaction AND current step is NOT clickable, we cover the hole */}
-      {shouldBlockOutside && !isClickable && currentStep && (
+      {/* Cover the spotlight hole when clickable=false — independent of preventInteraction */}
+      {!isClickable && currentStep && (
         <AnimatedView
           style={blockerStyle}
           pointerEvents="auto" // Catch touches
