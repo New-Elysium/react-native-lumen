@@ -111,7 +111,8 @@ Wrapper component to register an element as a tour step.
 | `order`        | `number`             | `undefined` | Order of appearance (if `stepsOrder` not used). |
 | `spotlightShape` | `'rounded-rect' \| 'circle' \| 'pill'` | `'rounded-rect'` | Shape of the spotlight cutout. |
 | `borderRadius` | `number`             | `10`        | Border radius of the spotlight.                 |
-| `clickable`    | `boolean`            | `false`     | If `true`, the step remains interactive.        |
+| `clickable`    | `boolean`            | `false`     | If `true`, touches pass through the spotlight to the underlying element. Independent of `preventInteraction`. |
+| `preventInteraction` | `boolean`      | `true`      | If `false`, the dark backdrop is purely visual for this step and passes all touches through. Overrides the global setting. |
 | `required`     | `boolean`            | `false`     | If `true`, hides the skip button for this step. |
 | `completed`    | `boolean`            | `undefined` | If `false`, disables the next button until `true`. |
 | `style`        | `ViewStyle`          | `undefined` | Style for the wrapping container.               |
@@ -137,9 +138,13 @@ interface TourConfig {
    */
   springConfig?: WithSpringConfig;
   /**
-   * If true, prevents interaction with the underlying app while tour is active.
+   * Controls whether the dark backdrop blocks touches outside the spotlight.
+   * Default: true — the backdrop absorbs all touches; only the spotlit TourZone
+   * is interactive (subject to the step's clickable prop).
+   * Set to false to make the overlay purely visual for the whole tour.
+   * Can be overridden per-step via TourZone.preventInteraction.
    */
-  preventInteraction?: boolean;
+  preventInteraction?: boolean; // default: true
   /**
    * Custom labels for buttons.
    */
@@ -279,6 +284,57 @@ const MyCustomCard = ({ step, next, stop, required, completed }: CardProps) => (
     </View>
   </View>
 );
+```
+
+## Interaction Control
+
+Two independent props control what the user can touch during a tour step:
+
+| Prop | Controls | Default |
+|:---|:---|:---|
+| `preventInteraction` | Dark backdrop (area outside the spotlight) | `true` — backdrop blocks touches |
+| `clickable` | Spotlight hole (the highlighted TourZone area) | `false` — spotlight blocks touches |
+
+Because they are independent, any combination is valid:
+
+| `preventInteraction` | `clickable` | Behaviour |
+|:---|:---|:---|
+| `true` (default) | `false` (default) | Backdrop blocked. Spotlight blocked. User can only interact with the tooltip. |
+| `true` | `true` | Backdrop blocked. Spotlight is interactive — great for "try it yourself" steps. |
+| `false` | `false` | Backdrop passthrough. Spotlight blocked. Overlay is mostly decorative. |
+| `false` | `true` | Everything passthrough. Overlay is purely visual. |
+
+### Global setting (all steps)
+
+```tsx
+<TourProvider
+  config={{
+    preventInteraction: true, // default — block the backdrop globally
+  }}
+>
+```
+
+### Per-step override
+
+```tsx
+// Backdrop blocked globally, but this step lets the user interact with the element
+<TourZone
+  stepKey="try-it"
+  description="Tap the button to see what it does."
+  clickable={true}
+>
+  <MyButton />
+</TourZone>
+
+// Allow full pass-through for this step only
+<TourZone
+  stepKey="context"
+  description="Here's the feed — scroll around freely."
+  preventInteraction={false}
+  clickable={true}
+>
+  <FeedHeader />
+</TourZone>
 ```
 
 ## Multi-Screen Tours
