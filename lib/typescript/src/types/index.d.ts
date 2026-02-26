@@ -106,6 +106,12 @@ export interface TourStep {
      */
     clickable?: boolean;
     /**
+     * If true, prevents interaction with the underlying app for this specific step.
+     * Overrides the global preventInteraction setting from TourConfig.
+     * @default undefined (uses global setting)
+     */
+    preventInteraction?: boolean;
+    /**
      * If true, the skip button is hidden for this step (user must complete or press next).
      * @default false
      */
@@ -288,8 +294,15 @@ export interface TourConfig {
      */
     springConfig?: WithSpringConfig;
     /**
-     * If true, prevents interaction with the underlying app while tour is active.
-     * Default: false (interactions allowed outside the tooltip, but overlay might block them depending on implementation).
+     * Controls whether the dark backdrop blocks touches outside the spotlight.
+     *
+     * - `true` (default): The backdrop absorbs all touches. Only the spotlit TourZone
+     *   is interactive (subject to the step's `clickable` prop).
+     * - `false`: The backdrop is purely visual — all touches pass through to the app.
+     *
+     * Can be overridden per-step via `TourZone.preventInteraction`.
+     * The `clickable` prop on a step operates independently: it always controls
+     * whether the spotlight hole itself passes touches through, regardless of this setting.
      */
     preventInteraction?: boolean;
     /**
